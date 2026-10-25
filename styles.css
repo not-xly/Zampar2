@@ -130,19 +130,20 @@ button.danger { color: var(--danger); border-color: #e7b9b3; }
 /* Línea 1: icono · nombre · tipo · ubicación · asa de arrastre */
 .line1 {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 72px 84px 20px;
+  grid-template-columns: 20px minmax(0, 1fr) 66px 80px 40px;
   align-items: center;
   gap: 6px;
   font-size: 15px;
   line-height: 1.25;
 }
-.list[data-tab="mundo"] .line1 { grid-template-columns: 20px minmax(0, 1fr) 72px 20px; }
+.list[data-tab="mundo"] .line1 { grid-template-columns: 20px minmax(0, 1fr) 66px 40px; }
 
 /* Asa de arrastre: tres líneas horizontales */
 .handle {
   justify-self: end;
-  width: 20px;
-  height: 24px;
+  width: 40px;
+  height: 32px;
+  margin: -6px 0;
   position: relative;
   cursor: grab;
   touch-action: none;
@@ -150,9 +151,9 @@ button.danger { color: var(--danger); border-color: #e7b9b3; }
 .handle::before {
   content: "";
   position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 7px;
+  left: 12px;
+  right: 12px;
+  top: 10px;
   height: 2px;
   background: #b5aca2;
   box-shadow: 0 5px 0 #b5aca2, 0 10px 0 #b5aca2;
