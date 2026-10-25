@@ -207,6 +207,9 @@ button.danger { color: var(--danger); border-color: #e7b9b3; }
   white-space: nowrap;
 }
 
+/* En Mundo, la ubicación va en la segunda línea y también en negro */
+.line2.ubic { color: var(--text); }
+
 /* Fila desplegada: se ve todo el texto */
 .row.open .name,
 .row.open .ubic,
