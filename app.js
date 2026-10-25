@@ -2,12 +2,12 @@
 
 const STORAGE_KEY = "zampar2-v1";
 const BACKUP_KEY = "zampar2-v1-copia";
+const FILTERS_KEY = "zampar2-filtros";
 const TABS = { zaragoza: "Zaragoza", espana: "España", mundo: "Mundo" };
 const TIPOS = { formal: "Formal", informal: "Informal", tapeo: "Tapeo", investigar: "Investigar" };
 const PLACEHOLDER_UBICACION = {
   zaragoza: "Barrio o zona (opcional)",
   espana: "Ciudad o provincia",
-  mundo: "Ciudad, país",
 };
 const DELETE_WIDTH = 84;
 const EDGE = 56;        // zona junto al borde de la lista que hace desplazar al arrastrar
@@ -22,18 +22,17 @@ const ficha = document.getElementById("ficha");
 const form = document.getElementById("fichaForm");
 const fichaTitle = document.getElementById("fichaTitle");
 const fDelete = document.getElementById("fDelete");
+const ubicacionField = document.getElementById("ubicacionField");
+const paisField = document.getElementById("paisField");
+const ciudadField = document.getElementById("ciudadField");
 
 let restaurants = load();
 ensureOrden();
+const filters = loadFilters();
 let currentTab = "zaragoza";
 let editingId = null;
 let openId = null;
 let swipedId = null;
-const filters = {
-  zaragoza: { tipo: "", ubicacion: "" },
-  espana: { tipo: "", ubicacion: "" },
-  mundo: { tipo: "", ubicacion: "" },
-};
 
 // Datos
 
@@ -50,6 +49,30 @@ function load() {
     alert("No se han podido leer los datos guardados. Se ha creado una copia de seguridad.");
     return [];
   }
+}
+
+// Filtros seleccionados por pestaña. Se recuerdan entre sesiones.
+function loadFilters() {
+  const filtros = {
+    zaragoza: { tipo: "", ubicacion: "" },
+    espana: { tipo: "", ubicacion: "" },
+    mundo: { tipo: "", ubicacion: "" },
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || "{}");
+    for (const tab of Object.keys(filtros)) {
+      if (!saved[tab]) continue;
+      filtros[tab].tipo = String(saved[tab].tipo || "");
+      filtros[tab].ubicacion = String(saved[tab].ubicacion || "");
+    }
+  } catch (err) {
+    // Los filtros no son datos del usuario: si no se leen, se usan los valores por defecto.
+  }
+  return filtros;
+}
+
+function saveFilters() {
+  localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
 }
 
 // Cada restaurante tiene su posición en la lista de su pestaña. Si no la tiene
@@ -93,11 +116,22 @@ function toggleVisited(id) {
   render();
 }
 
+// En Mundo el campo de filtro y de orden es el país; en España, la ubicación.
+function lugar(r) {
+  return (currentTab === "mundo" ? r.pais : r.ubicacion) || "";
+}
+
 // Criterio alfabético para colocar un restaurante nuevo: Zaragoza por nombre;
-// España y Mundo por ubicación (y luego por nombre).
+// España por ubicación; Mundo por país y luego por ciudad (y en último lugar por nombre).
 function alphabeticalCompare(tab) {
   if (tab === "zaragoza") return (a, b) => collator.compare(a.nombre, b.nombre);
-  return (a, b) => collator.compare(a.ubicacion, b.ubicacion) || collator.compare(a.nombre, b.nombre);
+  if (tab === "mundo") {
+    return (a, b) =>
+      collator.compare(a.pais || "", b.pais || "") ||
+      collator.compare(a.ciudad || "", b.ciudad || "") ||
+      collator.compare(a.nombre, b.nombre);
+  }
+  return (a, b) => collator.compare(a.ubicacion || "", b.ubicacion || "") || collator.compare(a.nombre, b.nombre);
 }
 
 // Restaurantes de la pestaña actual en el orden de la lista (sin filtrar).
@@ -124,9 +158,7 @@ function addRestaurant(data) {
 function visibleRestaurants() {
   const f = filters[currentTab];
   return tabRestaurants().filter(
-    (r) =>
-      (!f.tipo || r.tipo === f.tipo) &&
-      (currentTab === "zaragoza" || !f.ubicacion || r.ubicacion === f.ubicacion)
+    (r) => (!f.tipo || r.tipo === f.tipo) && (currentTab === "zaragoza" || !f.ubicacion || lugar(r) === f.ubicacion)
   );
 }
 
@@ -253,15 +285,17 @@ function renderFilters() {
     return;
   }
 
-  const ubicaciones = [
-    ...new Set(restaurants.filter((r) => r.tab === currentTab && r.ubicacion).map((r) => r.ubicacion)),
+  const mundo = currentTab === "mundo";
+  const valores = [
+    ...new Set(restaurants.filter((r) => r.tab === currentTab && lugar(r)).map((r) => lugar(r))),
   ].sort(collator.compare);
-  if (!ubicaciones.includes(f.ubicacion)) f.ubicacion = "";
+  if (!valores.includes(f.ubicacion)) f.ubicacion = "";
 
   filterUbicacion.hidden = false;
+  filterUbicacion.setAttribute("aria-label", mundo ? "Filtrar por país" : "Filtrar por ubicación");
   filterUbicacion.replaceChildren(
-    option("", "Todas las ubicaciones"),
-    ...ubicaciones.map((u) => option(u, u))
+    option("", mundo ? "Todos los países" : "Todas las ubicaciones"),
+    ...valores.map((u) => option(u, u))
   );
   filterUbicacion.value = f.ubicacion;
 }
@@ -380,6 +414,7 @@ function setSwiped(id) {
 // Ficha
 
 function openFicha(r) {
+  const mundo = currentTab === "mundo";
   editingId = r ? r.id : null;
   fichaTitle.textContent = r ? "Editar restaurante" : `Nuevo restaurante · ${TABS[currentTab]}`;
   fDelete.hidden = !r;
@@ -388,9 +423,19 @@ function openFicha(r) {
   form.querySelectorAll('input[name="tipo"]').forEach((input) => {
     input.checked = r ? input.value === r.tipo : false;
   });
-  form.ubicacion.value = r ? r.ubicacion : "";
-  form.ubicacion.placeholder = PLACEHOLDER_UBICACION[currentTab];
-  form.ubicacion.required = currentTab !== "zaragoza";
+
+  // Mundo: país y ciudad por separado. Resto: una sola ubicación.
+  ubicacionField.hidden = mundo;
+  paisField.hidden = !mundo;
+  ciudadField.hidden = !mundo;
+  form.ubicacion.value = r && !mundo ? r.ubicacion : "";
+  form.ubicacion.placeholder = PLACEHOLDER_UBICACION[currentTab] || "";
+  form.ubicacion.required = currentTab === "espana";
+  form.pais.value = r && mundo ? r.pais || "" : "";
+  form.ciudad.value = r && mundo ? r.ciudad || "" : "";
+  form.pais.required = mundo;
+  form.ciudad.required = mundo;
+
   form.visitado.checked = Boolean(r && r.visitado);
   form.notas.value = r ? r.notas : "";
   ficha.showModal();
@@ -402,10 +447,16 @@ form.addEventListener("submit", (e) => {
   const data = {
     nombre: form.nombre.value.trim(),
     tipo: form.tipo.value,
-    ubicacion: form.ubicacion.value.trim(),
     visitado: form.visitado.checked,
     notas: form.notas.value.trim(),
   };
+  if (currentTab === "mundo") {
+    data.pais = form.pais.value.trim();
+    data.ciudad = form.ciudad.value.trim();
+    data.ubicacion = [data.ciudad, data.pais].filter(Boolean).join(", ");
+  } else {
+    data.ubicacion = form.ubicacion.value.trim();
+  }
   if (editingId) {
     Object.assign(findRestaurant(editingId), data);
   } else {
@@ -440,11 +491,13 @@ document.querySelectorAll(".tab").forEach((btn) => {
 
 filterTipo.addEventListener("change", () => {
   filters[currentTab].tipo = filterTipo.value;
+  saveFilters();
   render();
 });
 
 filterUbicacion.addEventListener("change", () => {
   filters[currentTab].ubicacion = filterUbicacion.value;
+  saveFilters();
   render();
 });
 
