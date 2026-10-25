@@ -194,7 +194,7 @@ button.danger { color: var(--danger); border-color: #e7b9b3; }
 }
 .name { font-weight: 600; }
 .tipo { text-align: left; font-size: 12px; color: var(--tipo); white-space: nowrap; }
-.ubic { text-align: left; font-size: 12px; color: var(--muted); }
+.ubic { text-align: left; font-size: 12px; color: var(--text); }
 
 /* Línea 2: notas (en Mundo, la ubicación va antes) */
 .line2 {
